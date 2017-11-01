@@ -3,14 +3,14 @@
 # Declare variables to be passed into your templates.
 replicaCount: 1
 image:
-  repository: nginx
+  repository: quizzer
   tag: stable
   pullPolicy: IfNotPresent
 service:
   name: quizzer
   type: ClusterIP
-  externalPort: 80
-  internalPort: 80
+  externalPort: 3000
+  internalPort: 3000
 ingress:
   enabled: false
   # Used to create an Ingress record.

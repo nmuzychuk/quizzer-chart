@@ -15,16 +15,53 @@ spec:
         app: {{ template "name" . }}
         release: {{ .Release.Name }}
     spec:
+      initContainers:
+        - name: init-db
+          image: busybox
+          command: ['sh', '-c', 'until nslookup ${DB_HOST}; do echo waiting for db; sleep 2; done;']
+          env:
+          - name: DB_HOST
+            value: {{ template "quizzer.postgresql.fullname" . }}
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: [ '/bin/sh', '-c' ]
+          args: [
+            'export DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@${DB_HOST}/quizzer_production &&
+             bundle exec rake db:create &&
+             bundle exec rake db:migrate &&
+             bundle exec rake db:seed &&
+             bundle exec rake assets:precompile &&
+             bundle exec rails server'
+          ]
+          env:
+          - name: RAILS_ENV
+            value: production
+          - name: SECRET_KEY_BASE
+            valueFrom:
+              secretKeyRef:
+                name: {{ template "fullname" . }}
+                key: secret_key_base
+          - name: DB_HOST
+            value: {{ template "quizzer.postgresql.fullname" . }}
+          - name: DB_USER
+            value: postgres
+          - name: DB_PASS
+            valueFrom:
+              secretKeyRef:
+                name: {{ template "quizzer.postgresql.fullname" . }}
+                key: postgres-password
+          - name: RAILS_SERVE_STATIC_FILES
+            value: "true"
           ports:
             - containerPort: {{ .Values.service.internalPort }}
           livenessProbe:
             httpGet:
               path: /
               port: {{ .Values.service.internalPort }}
+            initialDelaySeconds: 15
+            timeoutSeconds: 1
           readinessProbe:
             httpGet:
               path: /
